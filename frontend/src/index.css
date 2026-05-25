@@ -1,0 +1,62 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:root {
+  --bg-primary: #0f0f1a;
+  --bg-secondary: #1a1a2e;
+  --bg-card: #16213e;
+  --bg-elevated: #1f2f5a;
+  --accent-blue: #4f8ef7;
+  --accent-blue-light: #7bb0ff;
+  --accent-green: #4caf82;
+  --accent-red: #e55a6f;
+  --accent-orange: #f7a84f;
+  --accent-purple: #a78bfa;
+  --text-primary: #e8eaf6;
+  --text-secondary: #9ba3c2;
+  --text-muted: #6b7280;
+  --border: rgba(255,255,255,0.08);
+  --border-active: rgba(79,142,247,0.5);
+  --shadow: 0 4px 24px rgba(0,0,0,0.4);
+  --radius: 16px;
+  --radius-sm: 10px;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Nanum Gothic', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  font-size: 15px;
+  line-height: 1.65;
+  overscroll-behavior: none;
+  letter-spacing: -0.3px;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 스크롤바 */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* 공통 버튼 */
+button {
+  cursor: pointer;
+  border: none;
+  outline: none;
+  font-family: inherit;
+}
+
+/* 코드 블록 */
+code, pre {
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+}

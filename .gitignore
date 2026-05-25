@@ -1,0 +1,18 @@
+.DS_Store
+.idea/
+
+# Frontend dependencies and build outputs
+frontend/node_modules/
+frontend/build/
+frontend/.env
+frontend/.env.*
+
+# Backend build outputs and local runtime data
+backend/target/
+backend/data/*.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
