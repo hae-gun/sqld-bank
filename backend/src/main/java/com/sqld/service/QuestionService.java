@@ -1,7 +1,7 @@
 package com.sqld.service;
 
-import com.sqld.data.QuestionBank;
 import com.sqld.model.Question;
+import com.sqld.repository.QuestionRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -10,64 +10,62 @@ import java.util.stream.Collectors;
 @Service
 public class QuestionService {
 
-    private final List<Question> questions = QuestionBank.getAllQuestions();
+    private final QuestionRepository questionRepository;
     private final Random random = new Random();
 
+    public QuestionService(QuestionRepository questionRepository) {
+        this.questionRepository = questionRepository;
+    }
+
+    /** 전체 문제 목록 (필터 지원) */
+    public List<Question> getQuestions(String subject, String category, String type, String difficulty) {
+        return questionRepository.findByFilters(
+            emptyToNull(subject),
+            emptyToNull(category),
+            emptyToNull(type),
+            emptyToNull(difficulty)
+        );
+    }
+
+    /** 전체 문제 (필터 없음) */
     public List<Question> getAllQuestions() {
-        return Collections.unmodifiableList(questions);
+        return questionRepository.findAll();
     }
 
-    public Question getRandomQuestion() {
-        return questions.get(random.nextInt(questions.size()));
+    /** ID로 단건 조회 */
+    public Optional<Question> getQuestionById(int id) {
+        return questionRepository.findById(id);
     }
 
-    public Question getRandomQuestionByCategory(String category) {
-        List<Question> filtered = questions.stream()
-            .filter(q -> q.getCategory().equalsIgnoreCase(category))
-            .collect(Collectors.toList());
-        if (filtered.isEmpty()) return getRandomQuestion();
-        return filtered.get(random.nextInt(filtered.size()));
-    }
-
-    public Question getRandomQuestionByType(String type) {
-        List<Question> filtered = questions.stream()
-            .filter(q -> q.getType().equalsIgnoreCase(type))
-            .collect(Collectors.toList());
-        if (filtered.isEmpty()) return getRandomQuestion();
-        return filtered.get(random.nextInt(filtered.size()));
-    }
-
-    public Question getRandomQuestionByDifficulty(String difficulty) {
-        List<Question> filtered = questions.stream()
-            .filter(q -> q.getDifficulty().equalsIgnoreCase(difficulty))
-            .collect(Collectors.toList());
-        if (filtered.isEmpty()) return getRandomQuestion();
-        return filtered.get(random.nextInt(filtered.size()));
-    }
-
+    /** 카테고리 목록 */
     public List<String> getCategories() {
-        return questions.stream()
-            .map(Question::getCategory)
-            .distinct()
-            .sorted()
-            .collect(Collectors.toList());
+        return questionRepository.findDistinctCategories();
     }
 
-    public Question getQuestionById(int id) {
-        return questions.stream()
-            .filter(q -> q.getId() == id)
-            .findFirst()
-            .orElse(null);
+    /** 과목 목록 */
+    public List<String> getSubjects() {
+        return questionRepository.findDistinctSubjects();
     }
 
-    public List<Question> getRandomQuestions(int count, String category, String type, String difficulty) {
-        List<Question> filtered = questions.stream()
-            .filter(q -> category == null || q.getCategory().equalsIgnoreCase(category))
-            .filter(q -> type == null || q.getType().equalsIgnoreCase(type))
-            .filter(q -> difficulty == null || q.getDifficulty().equalsIgnoreCase(difficulty))
-            .collect(Collectors.toList());
+    /** 통계 */
+    public Map<String, Object> getStats() {
+        List<Question> all = questionRepository.findAll();
+        Map<String, Long> bySubject = all.stream()
+            .collect(Collectors.groupingBy(q -> q.getSubject() != null ? q.getSubject() : "미분류", Collectors.counting()));
+        Map<String, Long> byType = all.stream()
+            .collect(Collectors.groupingBy(q -> q.getType() != null ? q.getType() : "기타", Collectors.counting()));
+        Map<String, Long> byDifficulty = all.stream()
+            .collect(Collectors.groupingBy(q -> q.getDifficulty() != null ? q.getDifficulty() : "중", Collectors.counting()));
 
-        Collections.shuffle(filtered);
-        return filtered.stream().limit(count).collect(Collectors.toList());
+        Map<String, Object> stats = new LinkedHashMap<>();
+        stats.put("total", all.size());
+        stats.put("bySubject", bySubject);
+        stats.put("byType", byType);
+        stats.put("byDifficulty", byDifficulty);
+        return stats;
+    }
+
+    private String emptyToNull(String s) {
+        return (s == null || s.isBlank()) ? null : s;
     }
 }

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import './App.css';
-import { QUESTIONS, getStats } from './questions';
 import { AuthProvider, useAuth } from './AuthContext';
 import AuthScreen from './AuthScreen';
 import HistoryCard from './HistoryCard';
@@ -101,6 +100,10 @@ function AppInner() {
 
 // ─── 퀴즈 앱 (로그인/게스트 공통) ───────────────
 function QuizApp({ user, authHeader, onLogout }) {
+  const [questions, setQuestions]         = useState([]);   // API에서 로드한 전체 문제
+  const [qLoading, setQLoading]           = useState(true); // 문제 로딩 중
+  const [qError, setQError]               = useState(false);
+  const [stats, setStats]                 = useState(null);
   const [question, setQuestion]           = useState(null);
   const [selectedCat, setSelectedCat]     = useState(null);
   const [selectedSub, setSelectedSub]     = useState(null);
@@ -115,14 +118,40 @@ function QuizApp({ user, authHeader, onLogout }) {
   const [usedIds, setUsedIds]             = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  // 로그인 시 서버에서 이력 로드
+  // 앱 시작 시 백엔드에서 전체 문제 로드
   useEffect(() => {
-    if (!user || !authHeader?.Authorization) return;
+    setQLoading(true);
+    Promise.all([
+      axios.get('/api/questions'),
+      axios.get('/api/questions/stats'),
+    ])
+      .then(([qRes, sRes]) => {
+        setQuestions(qRes.data);
+        setStats(sRes.data);
+        setQError(false);
+      })
+      .catch(() => setQError(true))
+      .finally(() => setQLoading(false));
+  }, []);
+
+  // 문제가 로드된 후 최초 문제 선택
+  useEffect(() => {
+    if (questions.length > 0 && !question) {
+      const first = questions[Math.floor(Math.random() * questions.length)];
+      setUsedIds([first.id]);
+      setQuestion(first);
+      setAnimation('slide-in');
+    }
+  }, [questions]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 로그인 시 서버에서 이력 로드 (문제도 이미 로드된 후)
+  useEffect(() => {
+    if (!user || !authHeader?.Authorization || questions.length === 0) return;
     setHistoryLoading(true);
     axios.get('/api/history', { headers: authHeader })
       .then(res => {
         const items = res.data.map(h => {
-          const q = QUESTIONS.find(qq => qq.id === h.questionId);
+          const q = questions.find(qq => qq.id === h.questionId);
           if (!q) return null;
           return makeHistoryItem(h.id, q, h.answeredCorrectly, h.selectedOption,
             h.retriedCorrectly, h.retriedOption);
@@ -134,15 +163,15 @@ function QuizApp({ user, authHeader, onLogout }) {
       .catch(() => {})
       .finally(() => setHistoryLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, questions]);
 
-  const pickQuestion = useCallback((cat, sub, used) => {
-    let pool = QUESTIONS
+  const pickQuestion = useCallback((cat, sub, used, qs) => {
+    let pool = qs
       .filter(q => !cat || q.category === cat)
       .filter(q => !sub || q.subject === sub)
       .filter(q => !used.includes(q.id));
     if (pool.length === 0) {
-      pool = QUESTIONS
+      pool = qs
         .filter(q => !cat || q.category === cat)
         .filter(q => !sub || q.subject === sub);
       setUsedIds([]);
@@ -151,21 +180,17 @@ function QuizApp({ user, authHeader, onLogout }) {
   }, []);
 
   const loadQuestion = useCallback((cat, sub, used) => {
+    if (questions.length === 0) return;
     setSelectedAns(null);
     setShowAnswer(false);
     setAnimation('slide-out');
     setTimeout(() => {
-      const next = pickQuestion(cat, sub, used);
+      const next = pickQuestion(cat, sub, used, questions);
       setUsedIds(prev => [...prev, next.id]);
       setQuestion(next);
       setAnimation('slide-in');
     }, 180);
-  }, [pickQuestion]);
-
-  useEffect(() => {
-    loadQuestion(null, null, []);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pickQuestion, questions]);
 
   const handleCatChange = (cat) => {
     setSelectedCat(cat);
@@ -220,7 +245,6 @@ function QuizApp({ user, authHeader, onLogout }) {
     ));
   };
 
-  const stats    = getStats();
   const accuracy = score.total > 0 ? Math.round((score.correct / score.total) * 100) : 0;
   const visibleCats = ALL_CATEGORIES.filter(c =>
     c.key === null || !subjectFilter || c.subject === subjectFilter
@@ -274,7 +298,7 @@ function QuizApp({ user, authHeader, onLogout }) {
                 {s.label}
               </button>
             ))}
-            <span className="total-badge">{QUESTIONS.length}문제</span>
+            <span className="total-badge">{questions.length}문제</span>
           </div>
           <div className="category-scroll">
             {visibleCats.map(cat => (
@@ -296,7 +320,20 @@ function QuizApp({ user, authHeader, onLogout }) {
         {/* 퀴즈 탭 */}
         {mainTab === 'quiz' && (
           <div className={`quiz-container ${animation}`}>
-            {question && (
+            {qLoading && (
+              <div className="loading">
+                <div className="spinner" />
+                <p>문제 불러오는 중...</p>
+              </div>
+            )}
+            {qError && (
+              <div className="empty-state">
+                <div className="empty-icon">⚠️</div>
+                <p>문제를 불러올 수 없습니다.</p>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>백엔드 서버가 실행 중인지 확인하세요.</p>
+              </div>
+            )}
+            {!qLoading && !qError && question && (
               <QuizCard
                 question={question}
                 selectedAns={selectedAns}
@@ -359,27 +396,27 @@ function QuizApp({ user, authHeader, onLogout }) {
           <div className="stats-container">
             <div className="stats-header"><h2>문제 은행 현황</h2></div>
             <div className="stats-big-card">
-              <div className="big-num">{stats.total}</div>
+              <div className="big-num">{stats?.total ?? 0}</div>
               <div className="big-label">총 문제 수</div>
             </div>
             <div className="stats-row-3">
               <div className="stats-small-card blue">
-                <div className="small-num">{stats.subject1}</div>
+                <div className="small-num">{stats?.bySubject?.['1과목'] ?? 0}</div>
                 <div className="small-label">1과목</div>
               </div>
               <div className="stats-small-card green">
-                <div className="small-num">{stats.subject2}</div>
+                <div className="small-num">{stats?.bySubject?.['2과목'] ?? 0}</div>
                 <div className="small-label">2과목</div>
               </div>
               <div className="stats-small-card purple">
-                <div className="small-num">{stats.기출}</div>
+                <div className="small-num">{stats?.byType?.['기출'] ?? 0}</div>
                 <div className="small-label">기출</div>
               </div>
             </div>
             <div className="diff-cards">
               <h3>난이도별</h3>
               <div className="diff-row">
-                {[['하', stats.하, '#4caf82'], ['중', stats.중, '#f7a84f'], ['상', stats.상, '#e55a6f']].map(([d, n, c]) => (
+                {[['하', stats?.byDifficulty?.['하'] ?? 0, '#4caf82'], ['중', stats?.byDifficulty?.['중'] ?? 0, '#f7a84f'], ['상', stats?.byDifficulty?.['상'] ?? 0, '#e55a6f']].map(([d, n, c]) => (
                   <div key={d} className="diff-card" style={{ borderColor: c + '44' }}>
                     <div className="diff-num" style={{ color: c }}>{n}</div>
                     <div className="diff-label">난이도 {d}</div>
@@ -390,9 +427,9 @@ function QuizApp({ user, authHeader, onLogout }) {
             <div className="category-stats">
               <h3>카테고리별 문제 수</h3>
               {ALL_CATEGORIES.filter(c => c.key).map(cat => {
-                const cnt = QUESTIONS.filter(q => q.category === cat.key).length;
+                const cnt = questions.filter(q => q.category === cat.key).length;
                 if (cnt === 0) return null;
-                const pct = Math.round((cnt / stats.total) * 100);
+                const pct = Math.round((cnt / (stats?.total ?? 1)) * 100);
                 return (
                   <div key={cat.key} className="cat-stat-row">
                     <span className="cat-stat-label">{cat.icon} {cat.label}</span>
