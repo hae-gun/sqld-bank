@@ -117,6 +117,7 @@ function QuizApp({ user, authHeader, onLogout }) {
   const [animation, setAnimation]         = useState('');
   const [usedIds, setUsedIds]             = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyFilter, setHistoryFilter]   = useState('all'); // 'all' | 'correct' | 'wrong' | 'retry'
 
   // 앱 시작 시 백엔드에서 전체 문제 로드
   useEffect(() => {
@@ -374,20 +375,47 @@ function QuizApp({ user, authHeader, onLogout }) {
               </div>
             )}
 
-            {!historyLoading && history.length > 0 && (
-              <>
-                <p className="history-tip">💡 문제를 클릭하면 다시 풀 수 있습니다.</p>
-                <div className="history-list">
-                  {history.map(item => (
-                    <HistoryCard
-                      key={item.id}
-                      item={item}
-                      onRetryDone={handleRetryDone}
-                    />
-                  ))}
-                </div>
-              </>
-            )}
+            {!historyLoading && history.length > 0 && (() => {
+              const filteredHistory = history.filter(item => {
+                if (historyFilter === 'correct')   return item.correct && !item.retriedCorrectly;
+                if (historyFilter === 'wrong')     return !item.correct && !item.retriedCorrectly;
+                if (historyFilter === 'retry')     return item.retriedCorrectly;
+                return true; // 'all'
+              });
+              return (
+                <>
+                  <div className="history-tip-row">
+                    <p className="history-tip">💡 문제를 클릭하면 다시 풀 수 있습니다.</p>
+                    <select
+                      className="history-filter-select"
+                      value={historyFilter}
+                      onChange={e => setHistoryFilter(e.target.value)}
+                    >
+                      <option value="all">모두 보기</option>
+                      <option value="correct">✅ 정답만</option>
+                      <option value="wrong">❌ 오답만</option>
+                      <option value="retry">🔄 재시도 정답만</option>
+                    </select>
+                  </div>
+                  {filteredHistory.length === 0 ? (
+                    <div className="empty-state">
+                      <div className="empty-icon">🔍</div>
+                      <p>해당 조건의 문제가 없습니다.</p>
+                    </div>
+                  ) : (
+                    <div className="history-list">
+                      {filteredHistory.map(item => (
+                        <HistoryCard
+                          key={item.id}
+                          item={item}
+                          onRetryDone={handleRetryDone}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
 

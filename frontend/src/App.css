@@ -952,6 +952,34 @@
 }
 
 /* ===== 기록 카드 (클릭-재시도) ===== */
+.history-tip-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.history-filter-select {
+  flex-shrink: 0;
+  appearance: none;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 28px 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  outline: none;
+  transition: border-color .2s;
+}
+.history-filter-select:focus {
+  border-color: var(--accent-blue);
+}
+
 .history-tip {
   font-size: 12px;
   color: var(--text-muted);
